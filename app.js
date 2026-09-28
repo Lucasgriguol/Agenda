@@ -236,7 +236,7 @@ function renderFirebaseWarning() {
 function render() {
 
   const titles = {
-    dashboard: "Dashboard",
+    dashboard: "Inicio",
     clients: "Clientes",
     payments: "Pagos"
   };
