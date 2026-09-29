@@ -177,7 +177,7 @@ function rows() {
 /* ================== RENDER ================== */
 
 function render() {
-  const titles = { dashboard: "Dashboard", clients: "Clientes", history: "Historial" };
+  const titles = { dashboard: "Inicio", clients: "Clientes", history: "Historial" };
   $("#title").textContent = titles[view];
 
   $("#today").textContent = new Intl.DateTimeFormat("es-AR", {
