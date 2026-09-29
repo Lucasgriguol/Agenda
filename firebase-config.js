@@ -1,6 +1,4 @@
-// Pegá acá la configuración de tu proyecto Firebase.
-// Firebase Console → Project settings → Your apps → Web app.
-export const firebaseConfig = {
+window.firebaseConfig = {
   apiKey: "AIzaSyD1-fSxoJpmgBzKq28dAlKtjuPLrNbi1AQ",
   authDomain: "bdd-agenda.firebaseapp.com",
   projectId: "bdd-agenda",

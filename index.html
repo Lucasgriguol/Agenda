@@ -1,42 +1,59 @@
 <!doctype html>
 <html lang="es">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mis Cobros</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Mis Cobros</title>
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <aside class="sidebar">
-    <div class="brand"><span>Mis Cobros</span></div>
-    <nav>
-      <button class="nav-btn active" data-view="dashboard">Inicio</button>
-      <button class="nav-btn" data-view="clients">Clientes</button>
-      <button class="nav-btn" data-view="payments">Pagos</button>
-    </nav>
-  </aside>
+    <div class="app">
+        <aside>
+            <div class="brand">
+                <b>$</b>
+                <span><strong>Mis Cobros</strong><small>Control mensual</small></span>
+            </div>
+            <nav>
+                <button class="nav active" data-view="dashboard">Dashboard</button>
+                <button class="nav" data-view="clients">Clientes</button>
+                <button class="nav" data-view="history">Historial</button>
+            </nav>
+        </aside>
 
-  <main class="main">
-    <header class="topbar">
-      <div>
-        <h1 id="page-title">Inicio</h1>
-        <p id="today"></p>
-      </div>
-      <button class="primary" id="quick-payment">+ Registrar pago</button>
-    </header>
+        <main>
+            <header>
+                <div>
+                    <h1 id="title">Dashboard</h1>
+                    <p id="today"></p>
+                </div>
+                <div class="actions">
+                    <div id="months"></div>
+                    <button class="primary" id="newClient">+ Nuevo cliente</button>
+                </div>
+            </header>
 
-    <section id="app"></section>
-  </main>
-
-  <div class="modal hidden" id="modal">
-    <div class="modal-card">
-      <button class="close" id="close-modal">×</button>
-      <div id="modal-content"></div>
+            <section id="dashboard" class="view"></section>
+            <section id="clients" class="view hidden"></section>
+            <section id="history" class="view hidden"></section>
+        </main>
     </div>
-  </div>
 
-  <div id="toast" class="toast"></div>
+    <div id="modal" class="hidden">
+        <div class="backdrop" data-close></div>
+        <div class="modal">
+            <button class="x" data-close>×</button>
+            <div id="modalBody"></div>
+        </div>
+    </div>
 
-  <script type="module" src="app.js"></script>
+    <div id="toast"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="app.js"></script>
 </body>
+
 </html>
