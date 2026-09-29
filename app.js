@@ -299,7 +299,6 @@ function clientsView() {
       <h2>Clientes</h2>
       <div>
         <input class="search" id="clientSearch" placeholder="Buscar cliente...">
-        <button class="primary" data-new>+ Nuevo cliente</button>
       </div>
     </div>
     <div class="table-card" id="clientTable">${table(clients)}</div>`;
