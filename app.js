@@ -1,6 +1,8 @@
 /* global firebase */
 "use strict";
 
+/* ================== INIT ================== */
+
 firebase.initializeApp(window.firebaseConfig);
 const db = firebase.firestore();
 const FieldValue = firebase.firestore.FieldValue;
@@ -11,12 +13,15 @@ const DEFAULT_SERVICES = [
   { id: "web-redes", name: "Web + redes sociales", price: 0, order: 3 }
 ];
 
+/* ================== ESTADO ================== */
+
 let clients = [];
 let payments = [];
 let services = [];
+let notes = [];
 let view = "dashboard";
 let timer;
-let month = localMonth();
+const month = localMonth(); // mes fijo = mes actual
 let currentPayId = null;
 
 /* ================== HELPERS ================== */
@@ -63,12 +68,6 @@ function ml(m) {
   return s[0].toUpperCase() + s.slice(1);
 }
 
-function shift(m, n) {
-  const d = md(m);
-  d.setMonth(d.getMonth() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
 function df(v) {
   return v ? String(v).split("-").reverse().join("/") : "-";
 }
@@ -81,17 +80,7 @@ function pid(id, m) {
   return `monthly__${id}__${m}`;
 }
 
-function days(m) {
-  const [y, n] = m.split("-").map(Number);
-  return new Date(y, n, 0).getDate();
-}
-
-function due(m, d) {
-  const day = Math.min(Math.max(Number(d) || 1, 1), days(m));
-  return `${m}-${String(day).padStart(2, "0")}`;
-}
-
-/* ============ Pagos parciales (abonos) ============ */
+/* ================== PAGOS (ABONOS) ================== */
 
 function getAbonos(p) {
   if (Array.isArray(p?.abonos) && p.abonos.length) return p.abonos;
@@ -156,7 +145,7 @@ function close() {
   currentPayId = null;
 }
 
-/* ================== DATOS ================== */
+/* ================== CARGA DE DATOS ================== */
 
 async function loadServices() {
   try {
@@ -181,9 +170,26 @@ async function loadServices() {
   }
 }
 
+async function loadNotes() {
+  try {
+    const s = await db.collection("notes").get();
+    notes = s.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => {
+        const av = a.updatedAt?.seconds || a.createdAt?.seconds || 0;
+        const bv = b.updatedAt?.seconds || b.createdAt?.seconds || 0;
+        return bv - av;
+      });
+  } catch (e) {
+    console.error(e);
+    notes = [];
+  }
+}
+
 async function load() {
   try {
     await loadServices();
+    await loadNotes();
 
     const cs = await db.collection("clients").get();
     clients = cs.docs
@@ -226,7 +232,6 @@ async function ensureMonth() {
       method: "",
       abonos: [],
       paidAmount: 0,
-      dueDate: due(month, c.dueDay),
       service: c.service,
       createdAt: FieldValue.serverTimestamp()
     };
@@ -242,7 +247,7 @@ function rows() {
     .map((c) => ({ c, p: payments.find((p) => p.id === pid(c.id, month)) }))
     .filter((x) => x.p)
     .sort((a, b) =>
-      String(a.p?.dueDate || "").localeCompare(String(b.p?.dueDate || ""))
+      String(a.c.name || "").localeCompare(String(b.c.name || ""), "es")
     );
 }
 
@@ -253,7 +258,8 @@ function render() {
     dashboard: "Inicio",
     clients: "Clientes",
     services: "Servicios",
-    history: "Historial"
+    history: "Historial",
+    notes: "Notas"
   };
   $("#title").textContent = titles[view] || "Inicio";
 
@@ -264,13 +270,9 @@ function render() {
     year: "numeric"
   }).format(new Date());
 
-  $("#months").style.display = view === "dashboard" ? "flex" : "none";
-  $("#months").innerHTML = `
-    <button data-month="-1">‹</button>
-    <div class="month-title">${esc(ml(month))}</div>
-    <button data-month="1">›</button>`;
+  $("#monthBadge").textContent = ml(month);
 
-  ["dashboard", "clients", "services", "history"].forEach((v) =>
+  ["dashboard", "clients", "services", "history", "notes"].forEach((v) =>
     $("#" + v).classList.toggle("hidden", v !== view)
   );
 
@@ -282,7 +284,10 @@ function render() {
   clientsView();
   servicesView();
   historyView();
+  notesView();
 }
+
+/* ================== VISTA: DASHBOARD ================== */
 
 function dashboard() {
   const r = rows();
@@ -317,7 +322,7 @@ function dashboard() {
               <table>
                 <thead>
                   <tr>
-                    <th>Cliente</th><th>Servicio</th><th>Vencimiento</th>
+                    <th>Cliente</th><th>Servicio</th>
                     <th>Total</th><th>Pagado</th><th>Estado</th><th></th>
                   </tr>
                 </thead>
@@ -327,7 +332,6 @@ function dashboard() {
                       (x) => `<tr>
                         <td class="name">${esc(x.c.name)}</td>
                         <td>${esc(x.p.service)}</td>
-                        <td>${df(x.p.dueDate)}</td>
                         <td><b>${money(x.p.amount)}</b></td>
                         <td>${paidAmount(x.p) ? money(paidAmount(x.p)) : "-"}</td>
                         <td>${badgeHtml(x.p)}</td>
@@ -389,7 +393,8 @@ async function payAll() {
     ];
     const paid = abonos.reduce((s, a) => s + Number(a.amount || 0), 0);
     const total = Number(x.p.amount || 0);
-    const status = total > 0 && paid >= total ? "paid" : paid > 0 ? "partial" : "pending";
+    const status =
+      total > 0 && paid >= total ? "paid" : paid > 0 ? "partial" : "pending";
 
     await db.collection("payments").doc(x.p.id).update({
       abonos,
@@ -409,13 +414,15 @@ async function payAll() {
   toast("Pagos registrados");
 }
 
+/* ================== VISTA: CLIENTES ================== */
+
 function clientsView() {
   const table = (list) =>
     list.length
       ? `<div style="overflow:auto">
           <table>
             <thead>
-              <tr><th>Cliente</th><th>Servicio</th><th>Mensual</th><th>Vencimiento</th><th>Estado</th><th></th></tr>
+              <tr><th>Cliente</th><th>Servicio</th><th>Mensual</th><th>Estado</th><th></th></tr>
             </thead>
             <tbody>
               ${list
@@ -424,7 +431,6 @@ function clientsView() {
                     <td class="name">${esc(c.name)}</td>
                     <td>${esc(c.service)}</td>
                     <td><b>${money(c.monthlyAmount)}</b></td>
-                    <td>Día ${c.dueDay}</td>
                     <td>${
                       c.active === false
                         ? '<span class="badge pending">Inactivo</span>'
@@ -433,6 +439,7 @@ function clientsView() {
                     <td>
                       <button class="action" data-detail="${c.id}">Historial</button>
                       <button class="action" data-edit="${c.id}">Editar</button>
+                      <button class="action danger" data-del-client="${c.id}">Eliminar</button>
                     </td>
                   </tr>`
                 )
@@ -458,6 +465,206 @@ function clientsView() {
   });
 }
 
+function form(c = null) {
+  const edit = !!c;
+
+  if (!services.length) {
+    toast("Primero creá un servicio");
+    view = "services";
+    render();
+    return;
+  }
+
+  modal(`
+    <h2>${edit ? "Editar cliente" : "Nuevo cliente"}</h2>
+    <form class="form" id="clientForm">
+      <div class="grid">
+        <div class="field full">
+          <label>Cliente</label>
+          <input name="name" required placeholder="Ej: Nike, Juan Pérez, Marca ABC" value="${esc(c?.name || "")}">
+        </div>
+        <div class="field full">
+          <label>Servicio</label>
+          <select name="service" required>
+            <option value="">Elegí un servicio</option>
+            ${services
+              .map(
+                (s) => `<option value="${esc(s.name)}" data-price="${s.price}" ${
+                  s.name === c?.service ? "selected" : ""
+                }>${esc(s.name)} — ${money(s.price)}</option>`
+              )
+              .join("")}
+          </select>
+        </div>
+        <div class="field full">
+          <label>Monto mensual</label>
+          <input name="amount" type="number" min="0" required value="${c?.monthlyAmount ?? ""}">
+        </div>
+        ${
+          edit
+            ? `<div class="field full">
+                 <label>Estado</label>
+                 <select name="active">
+                   <option value="true" ${c.active !== false ? "selected" : ""}>Activo</option>
+                   <option value="false" ${c.active === false ? "selected" : ""}>Inactivo</option>
+                 </select>
+               </div>
+               <div class="field full">
+                 <label style="display:flex;gap:8px;align-items:center;font-weight:400">
+                   <input type="checkbox" name="sync" checked>
+                   Actualizar el importe del pago pendiente de este mes
+                 </label>
+               </div>`
+            : ""
+        }
+      </div>
+      <div class="form-actions">
+        <button type="button" class="secondary" data-close>Cancelar</button>
+        <button class="primary">${edit ? "Guardar cambios" : "Crear cliente"}</button>
+      </div>
+    </form>`);
+
+  const formEl = $("#clientForm");
+  const sel = formEl.querySelector("[name=service]");
+  const amt = formEl.querySelector("[name=amount]");
+
+  sel.addEventListener("change", () => {
+    const opt = sel.options[sel.selectedIndex];
+    const price = opt.dataset.price;
+    if (price !== undefined && (!edit || !amt.value)) amt.value = price;
+  });
+
+  formEl.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(formEl);
+    const name = String(f.get("name") || "").trim();
+    const service = String(f.get("service") || "");
+    const amount = Number(f.get("amount") || 0);
+    const sync = f.get("sync") === "on";
+
+    if (!name || !service) return toast("Completá cliente y servicio");
+
+    const data = {
+      name,
+      service,
+      monthlyAmount: amount,
+      active: edit ? String(f.get("active")) !== "false" : true,
+      updatedAt: FieldValue.serverTimestamp()
+    };
+
+    try {
+      let clientId;
+      if (edit) {
+        await db.collection("clients").doc(c.id).update(data);
+        clientId = c.id;
+      } else {
+        const ref = await db
+          .collection("clients")
+          .add({ ...data, createdAt: FieldValue.serverTimestamp() });
+        clientId = ref.id;
+      }
+
+      if (edit && sync) {
+        const payId = pid(clientId, month);
+        const existing = payments.find((x) => x.id === payId);
+        if (existing && !isPaid(existing)) {
+          await db.collection("payments").doc(payId).update({
+            amount,
+            service,
+            updatedAt: FieldValue.serverTimestamp()
+          });
+        }
+      }
+
+      close();
+      toast(edit ? "Cliente actualizado" : "Cliente creado");
+      await load();
+    } catch (err) {
+      console.error(err);
+      toast("No se pudo guardar");
+    }
+  });
+}
+
+function deleteClient(id) {
+  const c = clients.find((x) => x.id === id);
+  if (!c) return;
+
+  const count = payments.filter(
+    (p) => p.type === "monthly" && p.clientId === id
+  ).length;
+
+  modal(`
+    <h2>Eliminar cliente</h2>
+    <p style="color:#6b7280;margin-top:4px">
+      <b>${esc(c.name)}</b> · ${esc(c.service)} · ${money(c.monthlyAmount)} por mes
+    </p>
+
+    <div class="danger-text">
+      ⚠️ Esta acción no se puede deshacer.${
+        count
+          ? ` Este cliente tiene <b>${count}</b> pago(s) en el historial.`
+          : ""
+      }
+    </div>
+
+    <form id="delClientForm" class="form">
+      ${
+        count
+          ? `<div class="field">
+               <label style="display:flex;gap:8px;align-items:center;font-weight:400">
+                 <input type="radio" name="mode" value="keep" checked>
+                 Eliminar solo el cliente (conservar su historial)
+               </label>
+               <label style="display:flex;gap:8px;align-items:center;font-weight:400;margin-top:6px">
+                 <input type="radio" name="mode" value="wipe">
+                 Eliminar el cliente <b>y todo su historial</b> (${count} pago/s)
+               </label>
+             </div>`
+          : `<p style="color:#6b7280">No tiene pagos en el historial.</p>`
+      }
+      <div class="form-actions">
+        <button type="button" class="secondary" data-close>Cancelar</button>
+        <button class="primary" style="background:#b91c1c">Eliminar</button>
+      </div>
+    </form>`);
+
+  $("#delClientForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const mode = String(f.get("mode") || "keep");
+
+    try {
+      if (mode === "wipe") {
+        const list = payments.filter(
+          (p) => p.type === "monthly" && p.clientId === id
+        );
+        for (const p of list) {
+          await db.collection("payments").doc(p.id).delete();
+        }
+        payments = payments.filter(
+          (p) => !(p.type === "monthly" && p.clientId === id)
+        );
+      }
+
+      await db.collection("clients").doc(id).delete();
+      clients = clients.filter((x) => x.id !== id);
+      close();
+      render();
+      toast(
+        mode === "wipe"
+          ? "Cliente e historial eliminados"
+          : "Cliente eliminado (historial conservado)"
+      );
+    } catch (err) {
+      console.error(err);
+      toast("No se pudo eliminar");
+    }
+  });
+}
+
+/* ================== VISTA: SERVICIOS ================== */
+
 function servicesView() {
   $("#services").innerHTML = `
     <div class="toolbar">
@@ -481,7 +688,7 @@ function servicesView() {
                         <td><b>${money(s.price)}</b></td>
                         <td>
                           <button class="action" data-edit-service="${s.id}">Editar</button>
-                          <button class="action" data-del-service="${s.id}">Eliminar</button>
+                          <button class="action danger" data-del-service="${s.id}">Eliminar</button>
                         </td>
                       </tr>`
                     )
@@ -595,14 +802,30 @@ async function deleteService(id) {
   await load();
 }
 
+/* ================== VISTA: HISTORIAL (solo pagos) ================== */
+
 function historyView() {
-  const list = payments
+  // Solo abonos: cada cobro individual con su cliente, fecha, monto y método
+  const list = [];
+  payments
     .filter((p) => p.type === "monthly")
-    .sort(
-      (a, b) =>
-        String(b.month).localeCompare(String(a.month)) ||
-        cid(a.clientId).localeCompare(cid(b.clientId), "es")
-    );
+    .forEach((p) => {
+      getAbonos(p).forEach((a, i) => {
+        list.push({
+          payId: p.id,
+          abonoIdx: i,
+          clientId: p.clientId,
+          month: p.month,
+          service: p.service,
+          date: a.date,
+          amount: Number(a.amount || 0),
+          method: a.method || "",
+          note: a.note || ""
+        });
+      });
+    });
+
+  list.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
   const table = (a) =>
     a.length
@@ -610,36 +833,39 @@ function historyView() {
           <table>
             <thead>
               <tr>
-                <th>Mes</th><th>Cliente</th><th>Servicio</th><th>Total</th>
-                <th>Pagado</th><th>Estado</th><th>Último pago</th>
+                <th>Fecha</th><th>Cliente</th><th>Servicio</th><th>Mes</th>
+                <th>Monto</th><th>Método</th><th>Nota</th><th></th>
               </tr>
             </thead>
             <tbody>
               ${a
-                .map((p) => {
-                  const ab = getAbonos(p);
-                  const last = ab.length ? ab[ab.length - 1] : null;
-                  return `<tr>
-                    <td>${esc(ml(p.month))}</td>
-                    <td class="name">${esc(cid(p.clientId))}</td>
-                    <td>${esc(p.service || "-")}</td>
-                    <td><b>${money(p.amount)}</b></td>
-                    <td>${paidAmount(p) ? money(paidAmount(p)) : "-"}</td>
-                    <td>${badgeHtml(p)}</td>
-                    <td>${last ? `${df(last.date)} · ${esc(last.method || "s/m")}` : "-"}</td>
-                  </tr>`;
-                })
+                .map(
+                  (x) => `<tr>
+                    <td>${df(x.date)}</td>
+                    <td class="name">${esc(cid(x.clientId))}</td>
+                    <td>${esc(x.service || "-")}</td>
+                    <td>${esc(ml(x.month))}</td>
+                    <td><b>${money(x.amount)}</b></td>
+                    <td>${esc(x.method || "-")}</td>
+                    <td>${esc(x.note || "-")}</td>
+                    <td>
+                      <button class="action danger" data-del-abono="${x.payId}|${x.abonoIdx}">
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>`
+                )
                 .join("")}
             </tbody>
           </table>
         </div>`
-      : `<div class="empty"><b>No hay historial todavía</b></div>`;
+      : `<div class="empty"><b>No hay pagos registrados todavía</b>Los cobros van a aparecer acá.</div>`;
 
   $("#history").innerHTML = `
     <div class="toolbar">
       <div>
-        <h2>Historial mensual</h2>
-        <div style="color:#6b7280;font-size:13px">Todos los meses quedan guardados.</div>
+        <h2>Historial de pagos</h2>
+        <div style="color:#6b7280;font-size:13px">Todos los cobros registrados, mes a mes.</div>
       </div>
       <input class="search" id="histSearch" placeholder="Buscar cliente...">
     </div>
@@ -653,137 +879,7 @@ function historyView() {
   });
 }
 
-/* ================== FORM CLIENTE ================== */
-
-function form(c = null) {
-  const edit = !!c;
-
-  if (!services.length) {
-    toast("Primero creá un servicio");
-    view = "services";
-    render();
-    return;
-  }
-
-  modal(`
-    <h2>${edit ? "Editar cliente" : "Nuevo cliente"}</h2>
-    <form class="form" id="clientForm">
-      <div class="grid">
-        <div class="field full">
-          <label>Cliente</label>
-          <input name="name" required placeholder="Ej: Nike, Juan Pérez, Marca ABC" value="${esc(c?.name || "")}">
-        </div>
-        <div class="field full">
-          <label>Servicio</label>
-          <select name="service" required>
-            <option value="">Elegí un servicio</option>
-            ${services
-              .map(
-                (s) => `<option value="${esc(s.name)}" data-price="${s.price}" ${
-                  s.name === c?.service ? "selected" : ""
-                }>${esc(s.name)} — ${money(s.price)}</option>`
-              )
-              .join("")}
-          </select>
-        </div>
-        <div class="field">
-          <label>Monto mensual</label>
-          <input name="amount" type="number" min="0" required value="${c?.monthlyAmount ?? ""}">
-        </div>
-        <div class="field">
-          <label>Día de vencimiento</label>
-          <input name="due" type="number" min="1" max="31" required value="${c?.dueDay ?? 10}">
-        </div>
-        ${
-          edit
-            ? `<div class="field full">
-                 <label>Estado</label>
-                 <select name="active">
-                   <option value="true" ${c.active !== false ? "selected" : ""}>Activo</option>
-                   <option value="false" ${c.active === false ? "selected" : ""}>Inactivo</option>
-                 </select>
-               </div>
-               <div class="field full">
-                 <label style="display:flex;gap:8px;align-items:center;font-weight:400">
-                   <input type="checkbox" name="sync" checked>
-                   Actualizar el importe del pago pendiente de este mes
-                 </label>
-               </div>`
-            : ""
-        }
-      </div>
-      <div class="form-actions">
-        <button type="button" class="secondary" data-close>Cancelar</button>
-        <button class="primary">${edit ? "Guardar cambios" : "Crear cliente"}</button>
-      </div>
-    </form>`);
-
-  const formEl = $("#clientForm");
-  const sel = formEl.querySelector("[name=service]");
-  const amt = formEl.querySelector("[name=amount]");
-
-  sel.addEventListener("change", () => {
-    const opt = sel.options[sel.selectedIndex];
-    const price = opt.dataset.price;
-    if (price !== undefined && (!edit || !amt.value)) amt.value = price;
-  });
-
-  formEl.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const f = new FormData(formEl);
-    const name = String(f.get("name") || "").trim();
-    const service = String(f.get("service") || "");
-    const amount = Number(f.get("amount") || 0);
-    const dueDay = Math.min(Math.max(Number(f.get("due") || 1), 1), 31);
-    const sync = f.get("sync") === "on";
-
-    if (!name || !service) return toast("Completá cliente y servicio");
-
-    const data = {
-      name,
-      service,
-      monthlyAmount: amount,
-      dueDay,
-      active: edit ? String(f.get("active")) !== "false" : true,
-      updatedAt: FieldValue.serverTimestamp()
-    };
-
-    try {
-      let clientId;
-      if (edit) {
-        await db.collection("clients").doc(c.id).update(data);
-        clientId = c.id;
-      } else {
-        const ref = await db
-          .collection("clients")
-          .add({ ...data, createdAt: FieldValue.serverTimestamp() });
-        clientId = ref.id;
-      }
-
-      if (edit && sync) {
-        const payId = pid(clientId, month);
-        const existing = payments.find((x) => x.id === payId);
-        if (existing && !isPaid(existing)) {
-          await db.collection("payments").doc(payId).update({
-            amount,
-            service,
-            dueDate: due(month, dueDay),
-            updatedAt: FieldValue.serverTimestamp()
-          });
-        }
-      }
-
-      close();
-      toast(edit ? "Cliente actualizado" : "Cliente creado");
-      await load();
-    } catch (err) {
-      console.error(err);
-      toast("No se pudo guardar");
-    }
-  });
-}
-
-/* ================== DETALLE ================== */
+/* ================== DETALLE DE CLIENTE ================== */
 
 function detail(id) {
   const c = clients.find((x) => x.id === id);
@@ -799,20 +895,27 @@ function detail(id) {
   modal(`
     <h2>${esc(c.name)}</h2>
     <p style="color:#6b7280">
-      ${esc(c.service)} · ${money(c.monthlyAmount)} por mes · Vence día ${c.dueDay}
+      ${esc(c.service)} · ${money(c.monthlyAmount)} por mes
     </p>
     <div class="stats" style="grid-template-columns:1fr 1fr">
       <div class="card"><div class="label">Cobrado histórico</div><div class="value">${money(totalCobrado)}</div></div>
       <div class="card"><div class="label">Pendiente histórico</div><div class="value">${money(totalPendiente)}</div></div>
     </div>
     <div class="table-card">
-      <div class="head"><h2>Historial</h2></div>
+      <div class="head">
+        <h2>Historial</h2>
+        ${
+          h.length
+            ? `<button class="action danger" data-wipe-client="${c.id}">Borrar todo el historial</button>`
+            : ""
+        }
+      </div>
       ${
         h.length
           ? `<div style="overflow:auto">
               <table>
                 <thead>
-                  <tr><th>Mes</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Último pago</th></tr>
+                  <tr><th>Mes</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Último pago</th><th></th></tr>
                 </thead>
                 <tbody>
                   ${h
@@ -825,6 +928,9 @@ function detail(id) {
                         <td>${paidAmount(p) ? money(paidAmount(p)) : "-"}</td>
                         <td>${badgeHtml(p)}</td>
                         <td>${last ? `${df(last.date)} · ${esc(last.method || "s/m")}` : "-"}</td>
+                        <td>
+                          <button class="action danger" data-del-pay="${p.id}">Eliminar</button>
+                        </td>
                       </tr>`;
                     })
                     .join("")}
@@ -836,7 +942,7 @@ function detail(id) {
     </div>`);
 }
 
-/* ================== PAGOS ================== */
+/* ================== PAGO (MODAL) ================== */
 
 function pay(id) {
   const p = payments.find((x) => x.id === id);
@@ -862,7 +968,7 @@ function renderPayModal(p) {
     </div>
 
     ${
-      abonos.length
+            abonos.length
         ? `<div class="abonos-list">
              <h3>Abonos registrados (${abonos.length})</h3>
              ${abonos
@@ -1018,6 +1124,211 @@ async function resetPay() {
   }
 }
 
+/* ================== ELIMINAR PAGOS / ABONOS ================== */
+
+// Elimina un abono individual desde el historial (formato "payId|idx")
+async function deleteAbonoFromHistory(key) {
+  const [payId, idxStr] = String(key).split("|");
+  const idx = Number(idxStr);
+  const p = payments.find((x) => x.id === payId);
+  if (!p) return;
+
+  const abonos = getAbonos(p);
+  const a = abonos[idx];
+  if (!a) return;
+
+  const msg =
+    `¿Eliminar el pago de ${money(a.amount)} del ${df(a.date)}?\n` +
+    `Cliente: ${cid(p.clientId)} · Mes: ${ml(p.month)}\n\n` +
+    `Esta acción no se puede deshacer.`;
+  if (!confirm(msg)) return;
+
+  const newAbonos = abonos.filter((_, i) => i !== idx);
+  const newPaid = newAbonos.reduce((s, x) => s + Number(x.amount || 0), 0);
+  const total = Number(p.amount || 0);
+  const newStatus =
+    total > 0 && newPaid >= total ? "paid" : newPaid > 0 ? "partial" : "pending";
+  const last = newAbonos[newAbonos.length - 1];
+
+  try {
+    await db.collection("payments").doc(p.id).update({
+      abonos: newAbonos,
+      paidAmount: newPaid,
+      status: newStatus,
+      paidDate: newStatus === "paid" && last ? last.date : "",
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    Object.assign(p, {
+      abonos: newAbonos,
+      paidAmount: newPaid,
+      status: newStatus,
+      paidDate: newStatus === "paid" && last ? last.date : ""
+    });
+    render();
+    toast("Pago eliminado");
+  } catch (err) {
+    console.error(err);
+    toast("No se pudo eliminar");
+  }
+}
+
+async function deletePayment(id) {
+  const p = payments.find((x) => x.id === id);
+  if (!p) return;
+
+  const cliente = cid(p.clientId);
+  const msg =
+    `¿Eliminar el pago de ${cliente} de ${ml(p.month)}?\n` +
+    `Total: ${money(p.amount)} · Pagado: ${money(paidAmount(p))}\n\n` +
+    `Esta acción no se puede deshacer.`;
+
+  if (!confirm(msg)) return;
+
+  try {
+    await db.collection("payments").doc(id).delete();
+    payments = payments.filter((x) => x.id !== id);
+    render();
+    toast("Pago eliminado del historial");
+  } catch (err) {
+    console.error(err);
+    toast("No se pudo eliminar");
+  }
+}
+
+async function wipeClientHistory(clientId) {
+  const list = payments.filter(
+    (p) => p.type === "monthly" && p.clientId === clientId
+  );
+  if (!list.length) return toast("Sin historial");
+
+  if (
+    !confirm(
+      `¿Borrar los ${list.length} pagos de ${cid(clientId)}?\n\nEsta acción no se puede deshacer.`
+    )
+  )
+    return;
+
+  try {
+    for (const p of list) {
+      await db.collection("payments").doc(p.id).delete();
+    }
+    payments = payments.filter(
+      (p) => !(p.type === "monthly" && p.clientId === clientId)
+    );
+    close();
+    render();
+    toast("Historial del cliente eliminado");
+  } catch (err) {
+    console.error(err);
+    toast("No se pudo eliminar");
+  }
+}
+
+/* ================== VISTA: NOTAS ================== */
+
+function notesView() {
+  $("#notes").innerHTML = `
+    <div class="toolbar">
+      <div>
+        <h2>Notas</h2>
+        <div style="color:#6b7280;font-size:13px">Anotá recordatorios, pendientes o ideas.</div>
+      </div>
+      <button class="primary" id="newNote">+ Nueva nota</button>
+    </div>
+    ${
+      notes.length
+        ? `<div class="notes-grid">
+            ${notes
+              .map(
+                (n) => `<div class="note-card">
+                  <h3>${esc(n.title || "Sin título")}</h3>
+                  <p>${esc(n.body || "")}</p>
+                  <div class="note-date">${df(n.date || "")}</div>
+                  <div class="note-actions">
+                    <button class="action" data-edit-note="${n.id}">Editar</button>
+                    <button class="action danger" data-del-note="${n.id}">Eliminar</button>
+                  </div>
+                </div>`
+              )
+              .join("")}
+          </div>`
+        : `<div class="table-card"><div class="empty"><b>No hay notas</b>Creá la primera.</div></div>`
+    }`;
+
+  $("#newNote").addEventListener("click", () => noteForm());
+}
+
+function noteForm(n = null) {
+  const edit = !!n;
+
+  modal(`
+    <h2>${edit ? "Editar nota" : "Nueva nota"}</h2>
+    <form id="noteForm" class="form">
+      <div class="grid">
+        <div class="field full">
+          <label>Título</label>
+          <input name="title" required value="${esc(n?.title || "")}" placeholder="Ej: Llamar a Juan">
+        </div>
+        <div class="field full">
+          <label>Contenido</label>
+          <textarea name="body" placeholder="Escribí acá...">${esc(n?.body || "")}</textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="secondary" data-close>Cancelar</button>
+        <button class="primary">${edit ? "Guardar" : "Crear nota"}</button>
+      </div>
+    </form>`);
+
+  $("#noteForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const title = String(f.get("title") || "").trim();
+    const body = String(f.get("body") || "").trim();
+    if (!title) return toast("Poné un título");
+
+    try {
+      if (edit) {
+        await db.collection("notes").doc(n.id).update({
+          title,
+          body,
+          date: n.date || today(),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } else {
+        await db.collection("notes").add({
+          title,
+          body,
+          date: today(),
+          createdAt: FieldValue.serverTimestamp()
+        });
+      }
+      close();
+      toast(edit ? "Nota actualizada" : "Nota creada");
+      await loadNotes();
+      render();
+    } catch (err) {
+      console.error(err);
+      toast("No se pudo guardar");
+    }
+  });
+}
+
+async function deleteNote(id) {
+  const n = notes.find((x) => x.id === id);
+  if (!n) return;
+  if (!confirm(`¿Eliminar la nota "${n.title || "Sin título"}"?`)) return;
+  try {
+    await db.collection("notes").doc(id).delete();
+    notes = notes.filter((x) => x.id !== id);
+    render();
+    toast("Nota eliminada");
+  } catch (err) {
+    console.error(err);
+    toast("No se pudo eliminar");
+  }
+}
+
 /* ================== EVENTOS ================== */
 
 document.addEventListener("click", (e) => {
@@ -1037,10 +1348,27 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  const m = e.target.closest("[data-month]");
-  if (m) {
-    month = shift(month, Number(m.dataset.month));
-    load();
+  const da = e.target.closest("[data-del-abono]");
+  if (da) {
+    deleteAbonoFromHistory(da.dataset.delAbono);
+    return;
+  }
+
+  const dp = e.target.closest("[data-del-pay]");
+  if (dp) {
+    deletePayment(dp.dataset.delPay);
+    return;
+  }
+
+  const wc = e.target.closest("[data-wipe-client]");
+  if (wc) {
+    wipeClientHistory(wc.dataset.wipeClient);
+    return;
+  }
+
+  const dc = e.target.closest("[data-del-client]");
+  if (dc) {
+    deleteClient(dc.dataset.delClient);
     return;
   }
 
@@ -1087,6 +1415,21 @@ document.addEventListener("click", (e) => {
     deleteService(ds.dataset.delService);
     return;
   }
+
+  const en = e.target.closest("[data-edit-note]");
+  if (en) {
+    const nt = notes.find((x) => x.id === en.dataset.editNote);
+    if (nt) noteForm(nt);
+    return;
+  }
+
+  const dn = e.target.closest("[data-del-note]");
+  if (dn) {
+    deleteNote(dn.dataset.delNote);
+    return;
+  }
 });
+
+/* ================== ARRANQUE ================== */
 
 load();

@@ -122,25 +122,13 @@ header p {
     display: none !important
 }
 
-#months {
-    display: flex;
-    align-items: center;
-    gap: 5px
-}
-
-#months button {
-    border: 1px solid #e5e7eb;
-    background: white;
-    height: 38px;
-    min-width: 38px;
-    border-radius: 8px;
-    cursor: pointer
-}
-
-.month-title {
-    min-width: 150px;
-    text-align: center;
+.month-badge {
+    background: #eef2ff;
+    color: #4338ca;
     font-weight: 700;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 8px;
     text-transform: capitalize
 }
 
@@ -264,6 +252,16 @@ th {
     border-color: #fecaca
 }
 
+.action.danger {
+    color: #b91c1c;
+    border-color: #fecaca
+}
+
+.action.danger:hover,
+.action.small:hover {
+    background: #fef2f2
+}
+
 .empty {
     text-align: center;
     padding: 40px;
@@ -352,10 +350,18 @@ th {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
     padding: 10px;
     border: 1px solid #e5e7eb;
-    border-radius: 8px
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px
+}
+
+.field textarea {
+    min-height: 140px;
+    resize: vertical
 }
 
 .form-actions {
@@ -414,6 +420,60 @@ th {
 .abono-row span {
     flex: 1;
     color: #4b5563
+}
+
+.danger-text {
+    color: #b91c1c;
+    font-size: 13px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px 0
+}
+
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 15px
+}
+
+.note-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 5px 20px #00000008;
+    display: flex;
+    flex-direction: column;
+    gap: 8px
+}
+
+.note-card h3 {
+    margin: 0;
+    font-size: 15px;
+    word-break: break-word
+}
+
+.note-card p {
+    margin: 0;
+    font-size: 13px;
+    color: #4b5563;
+    white-space: pre-wrap;
+    word-break: break-word;
+    flex: 1
+}
+
+.note-date {
+    font-size: 11px;
+    color: #9ca3af
+}
+
+.note-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    margin-top: 6px
 }
 
 #modal {
