@@ -19,6 +19,7 @@ let clients = [];
 let payments = [];
 let services = [];
 let notes = [];
+let specials = [];
 let view = "dashboard";
 let timer;
 const month = localMonth(); // mes fijo = mes actual
@@ -186,10 +187,23 @@ async function loadNotes() {
   }
 }
 
+async function loadSpecials() {
+  try {
+    const s = await db.collection("specials").get();
+    specials = s.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  } catch (e) {
+    console.error(e);
+    specials = [];
+  }
+}
+
 async function load() {
   try {
     await loadServices();
     await loadNotes();
+    await loadSpecials();
 
     const cs = await db.collection("clients").get();
     clients = cs.docs
@@ -292,14 +306,22 @@ function render() {
 function dashboard() {
   const r = rows();
   const total = r.reduce((s, x) => s + Number(x.p.amount || 0), 0);
-  const cobrado = r.reduce((s, x) => s + paidAmount(x.p), 0);
+  const cobradoMensual = r.reduce((s, x) => s + paidAmount(x.p), 0);
+  const cobradoEspeciales = specials
+    .filter((s) => String(s.date || "").slice(0, 7) === month)
+    .reduce((s, x) => s + Number(x.amount || 0), 0);
+  const cobrado = cobradoMensual + cobradoEspeciales;
   const pendiente = r.reduce((s, x) => s + remaining(x.p), 0);
   const pagaron = r.filter((x) => payStatus(x.p) === "paid").length;
   const parciales = r.filter((x) => payStatus(x.p) === "partial").length;
 
   $("#dashboard").innerHTML = `
     <div class="stats">
-      <div class="card"><div class="label">Cobrado</div><div class="value">${money(cobrado)}</div></div>
+      <div class="card">
+        <div class="label">Cobrado</div>
+        <div class="value">${money(cobrado)}</div>
+        ${cobradoEspeciales ? `<small style="color:#6b7280;font-size:11px">Incluye ${money(cobradoEspeciales)} de especiales</small>` : ""}
+      </div>
       <div class="card"><div class="label">Pendiente</div><div class="value">${money(pendiente)}</div></div>
       <div class="card"><div class="label">Total del mes</div><div class="value">${money(total)}</div></div>
       <div class="card"><div class="label">Pagos</div><div class="value">${pagaron}/${r.length}</div></div>
@@ -316,9 +338,8 @@ function dashboard() {
           <button class="action" id="payAll">Cobrar todo</button>
         </div>
       </div>
-      ${
-        r.length
-          ? `<div style="overflow:auto">
+      ${r.length
+      ? `<div style="overflow:auto">
               <table>
                 <thead>
                   <tr>
@@ -328,8 +349,8 @@ function dashboard() {
                 </thead>
                 <tbody>
                   ${r
-                    .map(
-                      (x) => `<tr>
+        .map(
+          (x) => `<tr>
                         <td class="name">${esc(x.c.name)}</td>
                         <td>${esc(x.p.service)}</td>
                         <td><b>${money(x.p.amount)}</b></td>
@@ -341,13 +362,13 @@ function dashboard() {
                           </button>
                         </td>
                       </tr>`
-                    )
-                    .join("")}
+        )
+        .join("")}
                 </tbody>
               </table>
             </div>`
-          : `<div class="empty"><b>No hay clientes</b>Agregá tu primer cliente.</div>`
-      }
+      : `<div class="empty"><b>No hay clientes</b>Agregá tu primer cliente.</div>`
+    }
     </div>`;
 
   $("#syncMonth").addEventListener("click", syncMonth);
@@ -426,24 +447,23 @@ function clientsView() {
             </thead>
             <tbody>
               ${list
-                .map(
-                  (c) => `<tr>
+        .map(
+          (c) => `<tr>
                     <td class="name">${esc(c.name)}</td>
                     <td>${esc(c.service)}</td>
                     <td><b>${money(c.monthlyAmount)}</b></td>
-                    <td>${
-                      c.active === false
-                        ? '<span class="badge pending">Inactivo</span>'
-                        : '<span class="badge paid">Activo</span>'
-                    }</td>
+                    <td>${c.active === false
+              ? '<span class="badge pending">Inactivo</span>'
+              : '<span class="badge paid">Activo</span>'
+            }</td>
                     <td>
                       <button class="action" data-detail="${c.id}">Historial</button>
                       <button class="action" data-edit="${c.id}">Editar</button>
                       <button class="action danger" data-del-client="${c.id}">Eliminar</button>
                     </td>
                   </tr>`
-                )
-                .join("")}
+        )
+        .join("")}
             </tbody>
           </table>
         </div>`
@@ -488,21 +508,19 @@ function form(c = null) {
           <select name="service" required>
             <option value="">Elegí un servicio</option>
             ${services
-              .map(
-                (s) => `<option value="${esc(s.name)}" data-price="${s.price}" ${
-                  s.name === c?.service ? "selected" : ""
-                }>${esc(s.name)} — ${money(s.price)}</option>`
-              )
-              .join("")}
+      .map(
+        (s) => `<option value="${esc(s.name)}" data-price="${s.price}" ${s.name === c?.service ? "selected" : ""
+          }>${esc(s.name)} — ${money(s.price)}</option>`
+      )
+      .join("")}
           </select>
         </div>
         <div class="field full">
           <label>Monto mensual</label>
           <input name="amount" type="number" min="0" required value="${c?.monthlyAmount ?? ""}">
         </div>
-        ${
-          edit
-            ? `<div class="field full">
+        ${edit
+      ? `<div class="field full">
                  <label>Estado</label>
                  <select name="active">
                    <option value="true" ${c.active !== false ? "selected" : ""}>Activo</option>
@@ -515,8 +533,8 @@ function form(c = null) {
                    Actualizar el importe del pago pendiente de este mes
                  </label>
                </div>`
-            : ""
-        }
+      : ""
+    }
       </div>
       <div class="form-actions">
         <button type="button" class="secondary" data-close>Cancelar</button>
@@ -601,17 +619,15 @@ function deleteClient(id) {
     </p>
 
     <div class="danger-text">
-      ⚠️ Esta acción no se puede deshacer.${
-        count
-          ? ` Este cliente tiene <b>${count}</b> pago(s) en el historial.`
-          : ""
-      }
+      ⚠️ Esta acción no se puede deshacer.${count
+      ? ` Este cliente tiene <b>${count}</b> pago(s) en el historial.`
+      : ""
+    }
     </div>
 
     <form id="delClientForm" class="form">
-      ${
-        count
-          ? `<div class="field">
+      ${count
+      ? `<div class="field">
                <label style="display:flex;gap:8px;align-items:center;font-weight:400">
                  <input type="radio" name="mode" value="keep" checked>
                  Eliminar solo el cliente (conservar su historial)
@@ -621,8 +637,8 @@ function deleteClient(id) {
                  Eliminar el cliente <b>y todo su historial</b> (${count} pago/s)
                </label>
              </div>`
-          : `<p style="color:#6b7280">No tiene pagos en el historial.</p>`
-      }
+      : `<p style="color:#6b7280">No tiene pagos en el historial.</p>`
+    }
       <div class="form-actions">
         <button type="button" class="secondary" data-close>Cancelar</button>
         <button class="primary" style="background:#b91c1c">Eliminar</button>
@@ -675,15 +691,14 @@ function servicesView() {
       <button class="primary" id="newService">+ Nuevo servicio</button>
     </div>
     <div class="table-card">
-      ${
-        services.length
-          ? `<div style="overflow:auto">
+      ${services.length
+      ? `<div style="overflow:auto">
               <table>
                 <thead><tr><th>Servicio</th><th>Precio</th><th></th></tr></thead>
                 <tbody>
                   ${services
-                    .map(
-                      (s) => `<tr>
+        .map(
+          (s) => `<tr>
                         <td class="name">${esc(s.name)}</td>
                         <td><b>${money(s.price)}</b></td>
                         <td>
@@ -691,13 +706,13 @@ function servicesView() {
                           <button class="action danger" data-del-service="${s.id}">Eliminar</button>
                         </td>
                       </tr>`
-                    )
-                    .join("")}
+        )
+        .join("")}
                 </tbody>
               </table>
             </div>`
-          : `<div class="empty"><b>No hay servicios</b>Creá el primero.</div>`
-      }
+      : `<div class="empty"><b>No hay servicios</b>Creá el primero.</div>`
+    }
     </div>`;
 
   $("#newService").addEventListener("click", () => serviceForm());
@@ -718,16 +733,15 @@ function serviceForm(s = null) {
           <label>Precio por defecto</label>
           <input name="price" type="number" min="0" required value="${s?.price ?? 0}">
         </div>
-        ${
-          edit
-            ? `<div class="field full">
+        ${edit
+      ? `<div class="field full">
                  <label style="display:flex;gap:8px;align-items:center;font-weight:400">
                    <input type="checkbox" name="sync" checked>
                    Actualizar el precio de los clientes con este servicio y sus pagos pendientes
                  </label>
                </div>`
-            : ""
-        }
+      : ""
+    }
       </div>
       <div class="form-actions">
         <button type="button" class="secondary" data-close>Cancelar</button>
@@ -805,25 +819,42 @@ async function deleteService(id) {
 /* ================== VISTA: HISTORIAL (solo pagos) ================== */
 
 function historyView() {
-  // Solo abonos: cada cobro individual con su cliente, fecha, monto y método
   const list = [];
   payments
     .filter((p) => p.type === "monthly")
     .forEach((p) => {
       getAbonos(p).forEach((a, i) => {
         list.push({
-          payId: p.id,
-          abonoIdx: i,
+          kind: "abono",
+          key: `${p.id}|${i}`,
           clientId: p.clientId,
+          clientName: cid(p.clientId),
+          concept: p.service || "Mensual",
           month: p.month,
-          service: p.service,
           date: a.date,
           amount: Number(a.amount || 0),
           method: a.method || "",
-          note: a.note || ""
+          note: a.note || "",
+          isSpecial: false
         });
       });
     });
+
+  specials.forEach((s) => {
+    list.push({
+      kind: "special",
+      key: s.id,
+      clientId: s.clientId || "",
+      clientName: s.clientName || (s.clientId ? cid(s.clientId) : "Sin cliente"),
+      concept: s.concept || "Cobro especial",
+      month: s.date ? String(s.date).slice(0, 7) : "",
+      date: s.date,
+      amount: Number(s.amount || 0),
+      method: s.method || "",
+      note: s.note || "",
+      isSpecial: true
+    });
+  });
 
   list.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
@@ -833,29 +864,34 @@ function historyView() {
           <table>
             <thead>
               <tr>
-                <th>Fecha</th><th>Cliente</th><th>Servicio</th><th>Mes</th>
-                <th>Monto</th><th>Método</th><th>Nota</th><th></th>
+                <th>Fecha</th><th>Tipo</th><th>Cliente</th><th>Concepto</th>
+                <th>Mes</th><th>Monto</th><th>Método</th><th>Nota</th><th></th>
               </tr>
             </thead>
             <tbody>
               ${a
-                .map(
-                  (x) => `<tr>
+        .map(
+          (x) => `<tr>
                     <td>${df(x.date)}</td>
-                    <td class="name">${esc(cid(x.clientId))}</td>
-                    <td>${esc(x.service || "-")}</td>
-                    <td>${esc(ml(x.month))}</td>
+                    <td>${x.isSpecial
+              ? '<span class="badge partial">Especial</span>'
+              : '<span class="badge paid">Mensual</span>'
+            }</td>
+                    <td class="name">${esc(x.clientName)}</td>
+                    <td>${esc(x.concept)}</td>
+                    <td>${x.month ? esc(ml(x.month)) : "-"}</td>
                     <td><b>${money(x.amount)}</b></td>
                     <td>${esc(x.method || "-")}</td>
                     <td>${esc(x.note || "-")}</td>
                     <td>
-                      <button class="action danger" data-del-abono="${x.payId}|${x.abonoIdx}">
-                        Eliminar
-                      </button>
+                      <button class="action danger" ${x.isSpecial
+              ? `data-del-special="${x.key}"`
+              : `data-del-abono="${x.key}"`
+            }>Eliminar</button>
                     </td>
                   </tr>`
-                )
-                .join("")}
+        )
+        .join("")}
             </tbody>
           </table>
         </div>`
@@ -867,14 +903,18 @@ function historyView() {
         <h2>Historial de pagos</h2>
         <div style="color:#6b7280;font-size:13px">Todos los cobros registrados, mes a mes.</div>
       </div>
-      <input class="search" id="histSearch" placeholder="Buscar cliente...">
+      <input class="search" id="histSearch" placeholder="Buscar cliente o concepto...">
     </div>
     <div class="table-card" id="histTable">${table(list)}</div>`;
 
   $("#histSearch").addEventListener("input", (e) => {
     const q = e.target.value.toLowerCase();
     $("#histTable").innerHTML = table(
-      list.filter((p) => cid(p.clientId).toLowerCase().includes(q))
+      list.filter(
+        (p) =>
+          p.clientName.toLowerCase().includes(q) ||
+          String(p.concept || "").toLowerCase().includes(q)
+      )
     );
   });
 }
@@ -889,7 +929,11 @@ function detail(id) {
     .filter((p) => p.type === "monthly" && p.clientId === id)
     .sort((a, b) => String(b.month).localeCompare(String(a.month)));
 
-  const totalCobrado = h.reduce((s, p) => s + paidAmount(p), 0);
+  const specialsList = specials.filter((s) => s.clientId === id);
+
+  const totalCobrado =
+    h.reduce((s, p) => s + paidAmount(p), 0) +
+    specialsList.reduce((s, x) => s + Number(x.amount || 0), 0);
   const totalPendiente = h.reduce((s, p) => s + remaining(p), 0);
 
   modal(`
@@ -901,28 +945,51 @@ function detail(id) {
       <div class="card"><div class="label">Cobrado histórico</div><div class="value">${money(totalCobrado)}</div></div>
       <div class="card"><div class="label">Pendiente histórico</div><div class="value">${money(totalPendiente)}</div></div>
     </div>
+
+    ${specialsList.length
+      ? `<div class="table-card">
+             <div class="head"><h2>Cobros especiales</h2></div>
+             <div style="overflow:auto">
+               <table>
+                 <thead><tr><th>Fecha</th><th>Concepto</th><th>Monto</th><th>Método</th></tr></thead>
+                 <tbody>
+                   ${specialsList
+        .map(
+          (s) => `<tr>
+                         <td>${df(s.date)}</td>
+                         <td>${esc(s.concept)}</td>
+                         <td><b>${money(s.amount)}</b></td>
+                         <td>${esc(s.method || "-")}</td>
+                       </tr>`
+        )
+        .join("")}
+                 </tbody>
+               </table>
+             </div>
+           </div>`
+      : ""
+    }
+
     <div class="table-card">
       <div class="head">
-        <h2>Historial</h2>
-        ${
-          h.length
-            ? `<button class="action danger" data-wipe-client="${c.id}">Borrar todo el historial</button>`
-            : ""
-        }
+        <h2>Historial mensual</h2>
+        ${h.length
+      ? `<button class="action danger" data-wipe-client="${c.id}">Borrar todo el historial</button>`
+      : ""
+    }
       </div>
-      ${
-        h.length
-          ? `<div style="overflow:auto">
+      ${h.length
+      ? `<div style="overflow:auto">
               <table>
                 <thead>
                   <tr><th>Mes</th><th>Total</th><th>Pagado</th><th>Estado</th><th>Último pago</th><th></th></tr>
                 </thead>
                 <tbody>
                   ${h
-                    .map((p) => {
-                      const ab = getAbonos(p);
-                      const last = ab[ab.length - 1];
-                      return `<tr>
+        .map((p) => {
+          const ab = getAbonos(p);
+          const last = ab[ab.length - 1];
+          return `<tr>
                         <td>${esc(ml(p.month))}</td>
                         <td>${money(p.amount)}</td>
                         <td>${paidAmount(p) ? money(paidAmount(p)) : "-"}</td>
@@ -932,13 +999,13 @@ function detail(id) {
                           <button class="action danger" data-del-pay="${p.id}">Eliminar</button>
                         </td>
                       </tr>`;
-                    })
-                    .join("")}
+        })
+        .join("")}
                 </tbody>
               </table>
             </div>`
-          : `<div class="empty"><b>Sin historial todavía</b></div>`
-      }
+      : `<div class="empty"><b>Sin historial todavía</b></div>`
+    }
     </div>`);
 }
 
@@ -967,24 +1034,22 @@ function renderPayModal(p) {
       <div><small>Pendiente</small><b style="color:${rem > 0 ? "#b45309" : "#15803d"}">${money(rem)}</b></div>
     </div>
 
-    ${
-            abonos.length
-        ? `<div class="abonos-list">
+    ${abonos.length
+      ? `<div class="abonos-list">
              <h3>Abonos registrados (${abonos.length})</h3>
              ${abonos
-               .map(
-                 (a, i) => `
+        .map(
+          (a, i) => `
                    <div class="abono-row">
-                     <span>${df(a.date)} · ${esc(a.method || "sin método")}${
-                   a.note ? ` · ${esc(a.note)}` : ""
-                 }</span>
+                     <span>${df(a.date)} · ${esc(a.method || "sin método")}${a.note ? ` · ${esc(a.note)}` : ""
+            }</span>
                      <b>${money(a.amount)}</b>
                      <button class="action small" data-rm-abono="${i}" title="Eliminar">×</button>
                    </div>`
-               )
-               .join("")}
+        )
+        .join("")}
            </div>`
-        : ""
+      : ""
     }
 
     <form id="payForm" class="form" style="margin-top:14px">
@@ -1126,7 +1191,6 @@ async function resetPay() {
 
 /* ================== ELIMINAR PAGOS / ABONOS ================== */
 
-// Elimina un abono individual desde el historial (formato "payId|idx")
 async function deleteAbonoFromHistory(key) {
   const [payId, idxStr] = String(key).split("|");
   const idx = Number(idxStr);
@@ -1224,6 +1288,115 @@ async function wipeClientHistory(clientId) {
   }
 }
 
+/* ================== COBRO ESPECIAL ================== */
+
+function specialForm() {
+  modal(`
+    <h2>Nuevo cobro especial</h2>
+    <p style="color:#6b7280;margin-top:4px">
+      Para ingresos que no son el abono mensual (torneos, trabajos puntuales, ventas, etc.).
+    </p>
+    <form id="specialForm" class="form">
+      <div class="grid">
+        <div class="field full">
+          <label>Concepto</label>
+          <input name="concept" required placeholder="Ej: Torneo de fútbol, Diseño de logo">
+        </div>
+        <div class="field full">
+          <label>Cliente (opcional)</label>
+          <select name="clientId">
+            <option value="">Sin cliente</option>
+            ${clients.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label>Monto</label>
+          <input name="amount" type="number" min="0" step="1" required>
+        </div>
+        <div class="field">
+          <label>Fecha</label>
+          <input name="date" type="date" value="${today()}" required>
+        </div>
+        <div class="field">
+          <label>Método</label>
+          <select name="method">
+            <option value="">No especificado</option>
+            <option>Transferencia</option>
+            <option>Efectivo</option>
+            <option>Mercado Pago</option>
+            <option>Tarjeta</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Nota (opcional)</label>
+          <input name="note" placeholder="Ej: 12 inscriptos">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="secondary" data-close>Cancelar</button>
+        <button class="primary">Guardar cobro</button>
+      </div>
+    </form>`);
+
+  $("#specialForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const concept = String(f.get("concept") || "").trim();
+    const clientId = String(f.get("clientId") || "");
+    const amount = Number(f.get("amount") || 0);
+    const date = String(f.get("date"));
+    const method = String(f.get("method") || "");
+    const note = String(f.get("note") || "").trim();
+
+    if (!concept) return toast("Poné un concepto");
+    if (amount <= 0) return toast("Ingresá un monto mayor a 0");
+
+    try {
+      await db.collection("specials").add({
+        concept,
+        clientId,
+        clientName: clientId ? cid(clientId) : "",
+        amount,
+        date,
+        method,
+        note,
+        createdAt: FieldValue.serverTimestamp()
+      });
+      close();
+      toast("Cobro especial guardado");
+      await loadSpecials();
+      render();
+    } catch (err) {
+      console.error(err);
+      toast("No se pudo guardar");
+    }
+  });
+}
+
+async function deleteSpecial(id) {
+  const s = specials.find((x) => x.id === id);
+  if (!s) return;
+  if (
+    !confirm(
+      `¿Eliminar el cobro especial "${s.concept || "Sin concepto"}" de ${money(
+        s.amount
+      )}?`
+    )
+  )
+    return;
+
+  try {
+    await db.collection("specials").doc(id).delete();
+    specials = specials.filter((x) => x.id !== id);
+    render();
+    toast("Cobro especial eliminado");
+  } catch (err) {
+    console.error(err);
+    toast("No se pudo eliminar");
+  }
+}
+
 /* ================== VISTA: NOTAS ================== */
 
 function notesView() {
@@ -1235,12 +1408,11 @@ function notesView() {
       </div>
       <button class="primary" id="newNote">+ Nueva nota</button>
     </div>
-    ${
-      notes.length
-        ? `<div class="notes-grid">
+    ${notes.length
+      ? `<div class="notes-grid">
             ${notes
-              .map(
-                (n) => `<div class="note-card">
+        .map(
+          (n) => `<div class="note-card">
                   <h3>${esc(n.title || "Sin título")}</h3>
                   <p>${esc(n.body || "")}</p>
                   <div class="note-date">${df(n.date || "")}</div>
@@ -1249,10 +1421,10 @@ function notesView() {
                     <button class="action danger" data-del-note="${n.id}">Eliminar</button>
                   </div>
                 </div>`
-              )
-              .join("")}
+        )
+        .join("")}
           </div>`
-        : `<div class="table-card"><div class="empty"><b>No hay notas</b>Creá la primera.</div></div>`
+      : `<div class="table-card"><div class="empty"><b>No hay notas</b>Creá la primera.</div></div>`
     }`;
 
   $("#newNote").addEventListener("click", () => noteForm());
@@ -1354,6 +1526,12 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  const ds2 = e.target.closest("[data-del-special]");
+  if (ds2) {
+    deleteSpecial(ds2.dataset.delSpecial);
+    return;
+  }
+
   const dp = e.target.closest("[data-del-pay]");
   if (dp) {
     deletePayment(dp.dataset.delPay);
@@ -1381,6 +1559,11 @@ document.addEventListener("click", (e) => {
 
   if (e.target.closest("#newClient,[data-new]")) {
     form();
+    return;
+  }
+
+  if (e.target.closest("#newSpecialPay")) {
+    specialForm();
     return;
   }
 

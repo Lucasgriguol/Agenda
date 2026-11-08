@@ -114,6 +114,15 @@ header p {
     cursor: pointer
 }
 
+.secondary {
+    border: 1px solid #e5e7eb;
+    background: white;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer
+}
+
 .view {
     padding: 25px 26px
 }
@@ -235,8 +244,7 @@ th {
     color: #1d4ed8
 }
 
-.action,
-.secondary {
+.action {
     border: 1px solid #e5e7eb;
     background: white;
     padding: 8px 11px;
@@ -360,7 +368,7 @@ th {
 }
 
 .field textarea {
-    min-height: 140px;
+    min-height: 160px;
     resize: vertical
 }
 
