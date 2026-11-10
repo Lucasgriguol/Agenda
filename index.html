@@ -2,63 +2,60 @@
 <html lang="es">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Mis Cobros</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101828">
+  <title>Mis Cobros</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <div class="app">
-        <aside>
-            <div class="brand">
-                <b>$</b>
-                <span><strong>Mis Cobros</strong><small>Control mensual</small></span>
-            </div>
-            <nav>
-                <button class="nav active" data-view="dashboard">Inicio</button>
-                <button class="nav" data-view="clients">Clientes</button>
-                <button class="nav" data-view="services">Servicios</button>
-                <button class="nav" data-view="history">Historial</button>
-                <button class="nav" data-view="notes">Notas</button>
-            </nav>
-        </aside>
-
-        <main>
-            <header>
-                <div>
-                    <h1 id="title">Inicio</h1>
-                    <p id="today"></p>
-                </div>
-                <div class="actions">
-                    <span class="month-badge" id="monthBadge"></span>
-                    <button class="secondary" id="newSpecialPay">+ Cobro especial</button>
-                    <button class="primary" id="newClient">+ Nuevo cliente</button>
-                </div>
-            </header>
-
-            <section id="dashboard" class="view"></section>
-            <section id="clients" class="view hidden"></section>
-            <section id="services" class="view hidden"></section>
-            <section id="history" class="view hidden"></section>
-            <section id="notes" class="view hidden"></section>
-        </main>
-    </div>
-
-    <div id="modal" class="hidden">
-        <div class="backdrop" data-close></div>
-        <div class="modal">
-            <button class="x" data-close>×</button>
-            <div id="modalBody"></div>
+  <div class="app">
+    <aside>
+      <div class="brand"><b>$</b><span><strong>Mis Cobros</strong><small>Controlá tu negocio</small></span></div>
+      <div class="nav-label">GESTIÓN</div>
+      <nav>
+        <button class="nav active" data-view="dashboard"><span>◫</span> Inicio</button>
+        <button class="nav" data-view="clients"><span>♙</span> Clientes</button>
+        <button class="nav" data-view="services"><span>▤</span> Servicios</button>
+        <button class="nav" data-view="history"><span>↗</span> Historial</button>
+        <button class="nav" data-view="expenses"><span>↘</span> Gastos</button>
+        <button class="nav" data-view="calendar"><span>▦</span> Vencimientos</button>
+        <button class="nav" data-view="notes"><span>▧</span> Notas</button>
+      </nav>
+      <div class="sidebar-foot">Tus números, siempre claros.</div>
+    </aside>
+    <main>
+      <header>
+        <div>
+          <div class="eyebrow">PANEL DE CONTROL</div>
+          <h1 id="title">Inicio</h1>
+          <p id="today"></p>
         </div>
+        <div class="actions"><span class="month-badge" id="monthBadge"></span><button class="secondary"
+            id="newSpecialPay">+ Cobro especial</button><button class="primary" id="newClient">+ Nuevo cliente</button>
+        </div>
+      </header>
+      <section id="dashboard" class="view"></section>
+      <section id="clients" class="view hidden"></section>
+      <section id="services" class="view hidden"></section>
+      <section id="history" class="view hidden"></section>
+      <section id="notes" class="view hidden"></section>
+      <section id="expenses" class="view hidden"></section>
+      <section id="calendar" class="view hidden"></section>
+    </main>
+  </div>
+  <div id="modal" class="hidden">
+    <div class="backdrop" data-close></div>
+    <div class="modal"><button class="x" data-close>×</button>
+      <div id="modalBody"></div>
     </div>
-
-    <div id="toast"></div>
-
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="firebase-config.js"></script>
-    <script src="app.js"></script>
+  </div>
+  <div id="toast"></div>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
 </body>
 
 </html>

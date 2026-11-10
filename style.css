@@ -581,3 +581,520 @@ th {
         grid-template-columns: 1fr 1fr 1fr
     }
 }
+
+/* ================== REDISEÑO MIS COBROS ================== */
+:root {
+    --ink: #172033;
+    --muted: #758198;
+    --line: #e8edf4;
+    --primary: #6258e8;
+    --green: #119b70;
+    --red: #dc5b68;
+    --surface: #fff
+}
+
+body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #f4f6fb;
+    color: var(--ink)
+}
+
+.app {
+    min-height: 100vh
+}
+
+aside {
+    width: 248px;
+    flex: 0 0 248px;
+    background: linear-gradient(165deg, #151d35 0%, #101729 100%);
+    padding: 26px 16px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 8px 0 30px #18213a0b
+}
+
+.brand {
+    padding: 2px 8px 34px;
+    gap: 12px
+}
+
+.brand>b {
+    width: 43px;
+    height: 43px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #8178ff, #5148d9);
+    box-shadow: 0 8px 20px #6258e855
+}
+
+.brand strong {
+    font-size: 16px;
+    letter-spacing: -.3px
+}
+
+.brand small {
+    color: #9da9c1
+}
+
+.nav-label,
+.eyebrow {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #8793ad
+}
+
+.nav-label {
+    padding: 0 12px 10px
+}
+
+nav {
+    gap: 7px
+}
+
+.nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 13px;
+    border-radius: 11px;
+    font-size: 13px;
+    font-weight: 650;
+    transition: .18s
+}
+
+.nav span {
+    font-size: 17px;
+    width: 20px;
+    text-align: center;
+    color: #aeb8cd
+}
+
+.nav.active,
+.nav:hover {
+    background: linear-gradient(90deg, #6258e833, #6258e814);
+    color: #fff
+}
+
+.nav.active {
+    box-shadow: inset 3px 0 #8279ff
+}
+
+.nav.active span {
+    color: #a69fff
+}
+
+.sidebar-foot {
+    margin-top: auto;
+    padding: 18px 10px 2px;
+    color: #76839d;
+    font-size: 11px;
+    border-top: 1px solid #ffffff12
+}
+
+main {
+    min-width: 0;
+    background: #f4f6fb
+}
+
+header {
+    padding: 23px 32px;
+    background: #ffffffed;
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    backdrop-filter: blur(12px)
+}
+
+h1 {
+    font-size: 25px;
+    letter-spacing: -.8px;
+    margin-top: 4px
+}
+
+.eyebrow {
+    color: #8c93a8
+}
+
+header p {
+    color: var(--muted)
+}
+
+.view {
+    padding: 28px 32px;
+    max-width: 1600px;
+    margin: auto
+}
+
+.primary,
+.secondary,
+.action {
+    border-radius: 10px;
+    transition: transform .15s, box-shadow .15s
+}
+
+.primary {
+    background: linear-gradient(135deg, #7168f1, #554bd8);
+    box-shadow: 0 5px 13px #6258e82c
+}
+
+.primary:hover,
+.secondary:hover,
+.action:hover {
+    transform: translateY(-1px)
+}
+
+.secondary {
+    border-color: var(--line);
+    color: #47516a
+}
+
+.month-badge {
+    border-radius: 10px;
+    background: #eeedff;
+    color: #554bd8
+}
+
+.stats {
+    gap: 16px
+}
+
+.card,
+.table-card {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 7px 25px #24304b08
+}
+
+.card {
+    padding: 21px;
+    position: relative;
+    overflow: hidden
+}
+
+.card .label {
+    font-size: 12px;
+    font-weight: 650;
+    color: #7e879a
+}
+
+.value {
+    font-size: 27px;
+    letter-spacing: -.8px;
+    margin-top: 2px
+}
+
+.card small {
+    display: block;
+    color: #8b94a7;
+    margin-top: 7px;
+    font-size: 11px
+}
+
+.table-card {
+    margin-bottom: 20px
+}
+
+.head {
+    padding: 19px 21px
+}
+
+.head h2,
+.toolbar h2,
+.section-top h2 {
+    font-size: 16px;
+    letter-spacing: -.25px
+}
+
+.head span {
+    color: #8b94a7
+}
+
+.table-scroll {
+    overflow: auto
+}
+
+th {
+    background: #fafbfe;
+    color: #8992a4;
+    letter-spacing: .5px
+}
+
+td {
+    color: #47516a
+}
+
+tr:last-child td {
+    border-bottom: 0
+}
+
+tbody tr:hover {
+    background: #fafbff
+}
+
+.badge {
+    padding: 6px 10px
+}
+
+.action {
+    background: #f3f4ff;
+    color: #5952c9;
+    border: 1px solid #e8e7ff;
+    padding: 7px 10px;
+    font-weight: 650
+}
+
+.action.danger {
+    background: #fff2f2;
+    color: #c84c59;
+    border-color: #ffe1e3
+}
+
+.modal {
+    border-radius: 18px;
+    box-shadow: 0 25px 90px #121a3040
+}
+
+.x {
+    border-radius: 9px
+}
+
+.form input,
+.form select,
+.search,
+.form textarea {
+    border: 1px solid #e1e6ef;
+    border-radius: 10px;
+    padding: 11px 12px
+}
+
+.form input:focus,
+.form select:focus,
+.search:focus {
+    outline: 3px solid #6258e81c;
+    border-color: #8179ef
+}
+
+.empty {
+    padding: 38px 20px;
+    color: #8992a4
+}
+
+.empty b {
+    color: #35405a
+}
+
+.positive {
+    color: var(--green)
+}
+
+.negative {
+    color: var(--red)
+}
+
+.section-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px
+}
+
+.section-top h2 {
+    margin: 0 0 5px
+}
+
+.section-top p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px
+}
+
+.calendar-weekday {
+    text-align: center;
+    color: #8b94a7;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 8px
+}
+
+.calendar-cell {
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    min-height: 112px;
+    padding: 9px;
+    min-width: 0
+}
+
+.calendar-cell>b {
+    font-size: 12px;
+    color: #68738a
+}
+
+.calendar-cell.muted {
+    background: #f0f2f7;
+    border-color: transparent
+}
+
+.calendar-event {
+    background: #fff2d9;
+    border-left: 3px solid #e8a53a;
+    color: #9a6414;
+    border-radius: 6px;
+    padding: 5px 6px;
+    margin-top: 7px;
+    font-size: 10px;
+    overflow-wrap: anywhere
+}
+
+.calendar-event.paid {
+    background: #e4f8ef;
+    border-color: #25a777;
+    color: #16815c
+}
+
+.calendar-event.partial {
+    background: #eeedff;
+    border-color: #756bed;
+    color: #554bd8
+}
+
+.calendar-event small {
+    display: block;
+    font-size: 9px;
+    margin-top: 2px;
+    color: inherit
+}
+
+@media(max-width:900px) {
+    aside {
+        width: 205px;
+        flex-basis: 205px
+    }
+
+    .view {
+        padding: 22px 18px
+    }
+
+    header {
+        padding: 18px
+    }
+
+    .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+}
+
+@media(max-width:620px) {
+    .app {
+        display: block
+    }
+
+    aside {
+        width: 100%;
+        min-height: auto;
+        padding: 13px 12px
+    }
+
+    .brand {
+        padding: 0 5px 12px
+    }
+
+    .brand>b {
+        width: 36px;
+        height: 36px
+    }
+
+    .nav-label,
+    .sidebar-foot {
+        display: none
+    }
+
+    nav {
+        display: flex;
+        overflow: auto;
+        gap: 5px;
+        padding-bottom: 2px
+    }
+
+    .nav {
+        white-space: nowrap;
+        padding: 9px 10px;
+        font-size: 11px
+    }
+
+    .nav span {
+        display: none
+    }
+
+    header {
+        position: static;
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 17px 16px
+    }
+
+    .actions {
+        width: 100%
+    }
+
+    .actions button {
+        flex: 1
+    }
+
+    .view {
+        padding: 18px 13px
+    }
+
+    .stats {
+        gap: 10px
+    }
+
+    .card {
+        padding: 15px
+    }
+
+    .value {
+        font-size: 21px
+    }
+
+    .calendar-grid {
+        gap: 4px
+    }
+
+    .calendar-cell {
+        min-height: 76px;
+        padding: 5px;
+        border-radius: 8px
+    }
+
+    .calendar-event {
+        font-size: 8px;
+        padding: 4px 3px
+    }
+
+    .calendar-event small {
+        font-size: 8px
+    }
+
+    .calendar-weekday {
+        font-size: 9px;
+        padding: 5px
+    }
+
+    .section-top {
+        align-items: flex-start;
+        flex-direction: column
+    }
+
+    .section-top button {
+        width: 100%
+    }
+}

@@ -1,5 +1,5 @@
 window.firebaseConfig = {
-  apiKey: "AIzaSyD1-fSxoJpmgBzKq28dAlKtjuPLrNbi1AQ",
+  apiKey: "AIzaSyD1-fSxoJpmBzKq28dAlKtjuPLrNbi1AQ",
   authDomain: "bdd-agenda.firebaseapp.com",
   projectId: "bdd-agenda",
   storageBucket: "bdd-agenda.firebasestorage.app",

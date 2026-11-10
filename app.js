@@ -20,6 +20,7 @@ let payments = [];
 let services = [];
 let notes = [];
 let specials = [];
+let expenses = [];
 let view = "dashboard";
 let timer;
 const month = localMonth(); // mes fijo = mes actual
@@ -204,6 +205,7 @@ async function load() {
     await loadServices();
     await loadNotes();
     await loadSpecials();
+    await loadExpenses();
 
     const cs = await db.collection("clients").get();
     clients = cs.docs
@@ -273,7 +275,9 @@ function render() {
     clients: "Clientes",
     services: "Servicios",
     history: "Historial",
-    notes: "Notas"
+    notes: "Notas",
+    expenses: "Gastos",
+    calendar: "Vencimientos"
   };
   $("#title").textContent = titles[view] || "Inicio";
 
@@ -286,7 +290,7 @@ function render() {
 
   $("#monthBadge").textContent = ml(month);
 
-  ["dashboard", "clients", "services", "history", "notes"].forEach((v) =>
+  ["dashboard", "clients", "services", "history", "notes", "expenses", "calendar"].forEach((v) =>
     $("#" + v).classList.toggle("hidden", v !== view)
   );
 
@@ -299,6 +303,8 @@ function render() {
   servicesView();
   historyView();
   notesView();
+  expensesView();
+  calendarView();
 }
 
 /* ================== VISTA: DASHBOARD ================== */
@@ -314,9 +320,13 @@ function dashboard() {
   const pendiente = r.reduce((s, x) => s + remaining(x.p), 0);
   const pagaron = r.filter((x) => payStatus(x.p) === "paid").length;
   const parciales = r.filter((x) => payStatus(x.p) === "partial").length;
+  const gastosMes = expenseTotal(expenses.filter(x => String(x.date || "").slice(0,7) === month));
+  const resultadoNeto = cobrado - gastosMes;
 
   $("#dashboard").innerHTML = `
     <div class="stats">
+      <div class="card financial-card"><div class="label">Resultado neto</div><div class="value ${resultadoNeto >= 0 ? "positive" : "negative"}">${money(resultadoNeto)}</div><small>Ingresos cobrados menos gastos</small></div>
+      <div class="card"><div class="label">Gastos del mes</div><div class="value negative">${money(gastosMes)}</div><small><a href="#" data-go-expenses>Ver gastos</a></small></div>
       <div class="card">
         <div class="label">Cobrado</div>
         <div class="value">${money(cobrado)}</div>
@@ -515,6 +525,11 @@ function form(c = null) {
       .join("")}
           </select>
         </div>
+        <div class="field">
+          <label>Día de vencimiento</label>
+          <input name="dueDay" type="number" min="1" max="31" value="${Number(c?.dueDay || 10)}" required>
+          <small>Para clientes existentes se usa el día 10 hasta que lo cambies.</small>
+        </div>
         <div class="field full">
           <label>Monto mensual</label>
           <input name="amount" type="number" min="0" required value="${c?.monthlyAmount ?? ""}">
@@ -566,6 +581,7 @@ function form(c = null) {
       name,
       service,
       monthlyAmount: amount,
+      dueDay: Math.min(31, Math.max(1, Number(f.get("dueDay") || 10))),
       active: edit ? String(f.get("active")) !== "false" : true,
       updatedAt: FieldValue.serverTimestamp()
     };
@@ -1501,6 +1517,47 @@ async function deleteNote(id) {
   }
 }
 
+/* ================== GASTOS Y CALENDARIO ================== */
+async function loadExpenses() {
+  try {
+    const snap = await db.collection("expenses").get();
+    expenses = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a,b) => String(b.date || "").localeCompare(String(a.date || "")));
+  } catch (e) { console.error("No se pudieron cargar los gastos", e); expenses = []; }
+}
+function expenseTotal(list) { return list.reduce((n,x) => n + Number(x.amount || 0), 0); }
+function expenseForm(item=null) {
+  modal(`<h2>${item ? "Editar gasto" : "Nuevo gasto"}</h2>
+    <form class="form" id="expenseForm"><div class="grid">
+      <div class="field full"><label>Concepto</label><input name="concept" required maxlength="90" value="${esc(item?.concept || "")}" placeholder="Ej. Internet, publicidad..."></div>
+      <div class="field"><label>Monto</label><input name="amount" type="number" min="1" step="0.01" required value="${item?.amount ?? ""}"></div>
+      <div class="field"><label>Fecha</label><input name="date" type="date" required value="${esc(item?.date || today())}"></div>
+      <div class="field"><label>Categoría</label><select name="category"><option ${item?.category==="Operativo"?"selected":""}>Operativo</option><option ${item?.category==="Herramientas"?"selected":""}>Herramientas</option><option ${item?.category==="Publicidad"?"selected":""}>Publicidad</option><option ${item?.category==="Servicios"?"selected":""}>Servicios</option><option ${item?.category==="Otro"?"selected":""}>Otro</option></select></div>
+      <div class="field"><label>Medio de pago</label><input name="method" value="${esc(item?.method || "")}" placeholder="Efectivo, transferencia..."></div>
+      <div class="field full"><label>Nota (opcional)</label><input name="note" value="${esc(item?.note || "")}"></div>
+    </div><div class="form-actions"><button type="button" class="secondary" data-close>Cancelar</button><button class="primary">Guardar gasto</button></div></form>`);
+  $("#expenseForm").addEventListener("submit", async e => { e.preventDefault(); const f=new FormData(e.currentTarget); const data={concept:String(f.get("concept")).trim(),amount:Number(f.get("amount")),date:String(f.get("date")),category:String(f.get("category")),method:String(f.get("method")||""),note:String(f.get("note")||""),updatedAt:FieldValue.serverTimestamp()};
+    try { if(item) await db.collection("expenses").doc(item.id).update(data); else await db.collection("expenses").add({...data,createdAt:FieldValue.serverTimestamp()}); close(); await loadExpenses(); render(); toast("Gasto guardado"); } catch(err){console.error(err);toast("No se pudo guardar el gasto");}
+  });
+}
+function expensesView() {
+  const el=$("#expenses"); if(!el) return;
+  const list=expenses.filter(x=>String(x.date||"").slice(0,7)===month);
+  el.innerHTML=`<div class="section-top"><div><h2>Gastos de ${esc(ml(month))}</h2><p>Registrá egresos para conocer tu resultado real.</p></div><button class="primary" id="addExpense">+ Nuevo gasto</button></div>
+  <div class="stats"><div class="card"><div class="label">Total de gastos</div><div class="value negative">${money(expenseTotal(list))}</div></div><div class="card"><div class="label">Movimientos</div><div class="value">${list.length}</div></div></div>
+  <div class="table-card"><div class="head"><h2>Movimientos</h2><span>${list.length} registros</span></div>${list.length?`<div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Medio</th><th>Monto</th><th></th></tr></thead><tbody>${list.map(x=>`<tr><td>${df(x.date)}</td><td class="name">${esc(x.concept)}</td><td>${esc(x.category||"-")}</td><td>${esc(x.method||"-")}</td><td class="negative"><b>${money(x.amount)}</b></td><td><button class="action" data-edit-expense="${x.id}">Editar</button> <button class="action danger" data-del-expense="${x.id}">Eliminar</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty"><b>Sin gastos este mes</b>Cuando registres uno, va a aparecer acá.</div>`}</div>`;
+  $("#addExpense").onclick=()=>expenseForm();
+}
+function calendarView() {
+  const el=$("#calendar"); if(!el) return;
+  const [yy,mm]=month.split("-").map(Number); const days=new Date(yy,mm,0).getDate();
+  const events=[];
+  clients.filter(c=>c.active!==false).forEach(c=>{const day=Math.min(days,Math.max(1,Number(c.dueDay||10)));const p=payments.find(x=>x.id===pid(c.id,month));events.push({day,name:c.name,amount:p?remaining(p):Number(c.monthlyAmount||0),status:p?payStatus(p):"pending",id:c.id});});
+  const byDay=Array.from({length:days},(_,i)=>({day:i+1,items:events.filter(x=>x.day===i+1)}));
+  el.innerHTML=`<div class="section-top"><div><h2>Calendario de ${esc(ml(month))}</h2><p>Los vencimientos se calculan según el día configurado en cada cliente.</p></div></div><div class="calendar-grid">${["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d=>`<div class="calendar-weekday">${d}</div>`).join("")}${Array.from({length:(new Date(yy,mm-1,1).getDay()+6)%7},()=>'<div class="calendar-cell muted"></div>').join("")}${byDay.map(d=>`<div class="calendar-cell"><b>${d.day}</b>${d.items.map(x=>`<div class="calendar-event ${x.status}" title="${esc(x.name)}">${esc(x.name)}<small>${x.amount?money(x.amount):"Al día"}</small></div>`).join("")}</div>`).join("")}</div>`;
+}
+async function removeExpense(id) { if(!confirm("¿Eliminar este gasto?")) return; try {await db.collection("expenses").doc(id).delete();await loadExpenses();render();toast("Gasto eliminado");}catch(e){console.error(e);toast("No se pudo eliminar");} }
+
 /* ================== EVENTOS ================== */
 
 document.addEventListener("click", (e) => {
@@ -1616,3 +1673,10 @@ document.addEventListener("click", (e) => {
 /* ================== ARRANQUE ================== */
 
 load();
+
+document.addEventListener("click", e => {
+  const edit=e.target.closest("[data-edit-expense]"); if(edit){const x=expenses.find(v=>v.id===edit.dataset.editExpense);if(x)expenseForm(x);return;}
+  const del=e.target.closest("[data-del-expense]"); if(del){removeExpense(del.dataset.delExpense);return;}
+});
+
+document.addEventListener("click", e => { if(e.target.closest("[data-go-expenses]")){e.preventDefault();view="expenses";render();} });
